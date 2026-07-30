@@ -83,9 +83,17 @@ go build -o bin/router ./cmd/router
 ```bash
 go test ./internal/codec/ -v     # 7 项：注册表、PCM、G711A/U、ADPCM、Opus、重采样
 go build ./...
+
+# mock 后端 + 端云 E2E（配合 ai_ws_esp32/e2e_tests）
+go build -o bin/mockbackends ./cmd/mockbackends
+./bin/mockbackends -asr :51051 -llm :51052 -tts :51061 &
+./bin/router -listen :9000 -asr 127.0.0.1:51051 -llm 127.0.0.1:51052 -tts 127.0.0.1:51061 &
+# 然后在 ai_ws_esp32/e2e_tests 构建运行设备模拟端（linux target）
 ```
 
 测试向量与 ESP32 端 `host_tests` 一致（静音码、误差容差、Opus 稳态能量比）。
+`cmd/mockbackends` 提供 canned 版 ASR（每 500ms 出一句）/LLM（固定回复）/
+TTS（0.8s 正弦）mediator.* 服务，用于无真实后端的集成联调。
 
 ## 待办（生产化）
 
