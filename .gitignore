@@ -1,0 +1,5 @@
+bin/
+server.key
+server_ca.pem
+*.pem
+!certs/*.pem

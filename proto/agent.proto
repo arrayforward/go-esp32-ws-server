@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+// 包名必须与上游网关 mediator（D:\vit\mediator proto/mediator.proto）一致，
+// gRPC 全限定方法名为 /mediator.LlmService/Generate 等，否则上游调用全部 UNIMPLEMENTED。
+option go_package = "router/gen/mediator;mediator";
+package mediator;
+
+
+// ---- LLM：大模型文本生成（quick/restate/answer/quick_placeholder 共用） ----
+service LlmService {
+  rpc Generate(LlmRequest) returns (LlmResponse);
+  rpc JudgeInterrupt(InterruptRequest) returns (InterruptResponse);
+}
+message LlmRequest {
+  string method = 1;   // quick / restate / answer / quick_placeholder
+  string text = 2;     // 用户问题或上下文
+  string session_id = 3;
+}
+message LlmResponse {
+  string text = 1;
+}
+
+// 打断语义判定：播放/思考期间收到 ASR final，网关不做能量/VAD 判断，
+// 提交本服务按语义决定是否打断（过滤噪声幻听/回声/无意义应声）。
+message InterruptRequest {
+  string text = 1;       // 候选打断文本（ASR final）
+  string session_id = 2;
+}
+message InterruptResponse {
+  bool interrupt = 1;    // true=打断当前回复，文本作为新语句进入流水线
+  string reason = 2;     // 判定理由（日志/观测用）
+}
+
+// ---- 业务控制指令 ----
+// 客户端 convai.v1 WebSocket 控制流由网关翻译为本服务的控制指令：
+//   start_session —— 会话建立（对应 hello/hello_ack 握手），重置会话为全新上下文
+//   interrupt    —— 用户打断（barge-in，对应客户端 AudioOp CANCEL 0x13），
+//                   取消该 session 正在进行的 LLM 生成
+//   end_session  —— 会话结束（对应客户端 bye），取消生成并清空会话上下文
+//   clear_context —— 仅清空会话上下文/长期记忆，保留会话
+service BusinessService {
+  rpc Control(ControlRequest) returns (ControlResponse);
+}
+message ControlRequest {
+  string cmd = 1;
+  string session_id = 2;
+}
+message ControlResponse {
+  string ack = 1;
+}
+
+// ---- 记忆服务：长期离线会话的上下文收割 ----
+service MemoryService {
+  rpc FetchContext(MemoryRequest) returns (MemoryResponse);
+}
+message MemoryRequest {
+  string redis_key = 1;   // ctx:{uid}，记忆服务自行去 Redis 取 1MB 上下文
+  string session_id = 2;
+}
+message MemoryResponse {
+  bool ok = 1;
+}

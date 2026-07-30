@@ -1,0 +1,20 @@
+// mediator_asr.proto — Mediator 网关 ASR 契约（子集）
+// 与 /mnt/d/vit/mediator/proto/mediator.proto 中 mediator.AsrService 逐字节对齐：
+// 仅抽取 ASR 部分（同 package、同消息名、同字段号），wire 格式完全兼容。
+syntax = "proto3";
+
+option go_package = "router/gen/mediator;mediator";
+package mediator;
+
+// ---- ASR：双向流式语音识别 ----
+service AsrService {
+  rpc StreamingRecognize(stream AsrRequest) returns (stream AsrResponse);
+}
+message AsrRequest {
+  bytes pcm = 1;      // PCM16 16kHz 单声道（网关已做 AEC/NS，E2E 中为原始帧）
+  uint32 flags = 2;   // 与网关 msgflag 对齐：1=VAD断句 2=ASR语义断句 4=有声
+}
+message AsrResponse {
+  string text = 1;
+  bool is_final = 2;
+}
